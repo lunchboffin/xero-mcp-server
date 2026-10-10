@@ -3,6 +3,11 @@ import { updateXeroInvoice } from "../../handlers/update-xero-invoice.handler.js
 import { DeepLinkType, getDeepLink } from "../../helpers/get-deeplink.js";
 import { CreateXeroTool } from "../../helpers/create-xero-tool.js";
 import { Invoice } from "xero-node";
+import {
+  InvoiceLineAmountTypeName,
+  invoiceLineAmountTypeNames,
+  toInvoiceLineAmountTypes,
+} from "../../helpers/to-invoice-line-amount-types.js";
 
 const trackingSchema = z.object({
   name: z.string().describe("The name of the tracking category. Can be obtained from the list-tracking-categories tool"),
@@ -44,6 +49,23 @@ const UpdateInvoiceTool = CreateXeroTool(
     date: z.string().optional().describe("The date of the invoice."),
     contactId: z.string().optional().describe("The ID of the contact to update the invoice for. \
       Can be obtained from the list-contacts tool."),
+    lineAmountTypes: z
+      .enum(invoiceLineAmountTypeNames)
+      .optional()
+      .describe(
+        "Optional line amount types (EXCLUSIVE, INCLUSIVE, NO_TAX). Left off, \
+the invoice keeps its current setting. Xero returns line items with their unit \
+amounts already reduced to tax exclusive values, so if you re-send line items \
+read back from an INCLUSIVE invoice, re-enter the original tax inclusive \
+amounts rather than the ones Xero returned.",
+      ),
+    brandingThemeId: z
+      .string()
+      .optional()
+      .describe(
+        "Optional branding theme ID, from the list-branding-themes tool. Left off, \
+the invoice keeps the theme it already has.",
+      ),
   },
   async (
     {
@@ -53,6 +75,8 @@ const UpdateInvoiceTool = CreateXeroTool(
       dueDate,
       date,
       contactId,
+      lineAmountTypes,
+      brandingThemeId,
     }: {
       invoiceId: string;
       lineItems?: Array<{
@@ -66,6 +90,8 @@ const UpdateInvoiceTool = CreateXeroTool(
       dueDate?: string;
       date?: string;
       contactId?: string;
+      lineAmountTypes?: InvoiceLineAmountTypeName;
+      brandingThemeId?: string;
     },
     //_extra: { signal: AbortSignal },
   ) => {
@@ -76,6 +102,8 @@ const UpdateInvoiceTool = CreateXeroTool(
       dueDate,
       date,
       contactId,
+      toInvoiceLineAmountTypes(lineAmountTypes),
+      brandingThemeId,
     );
     if (result.isError) {
       return {
@@ -106,6 +134,7 @@ const UpdateInvoiceTool = CreateXeroTool(
             `ID: ${invoice?.invoiceID}`,
             `Contact: ${invoice?.contact?.name}`,
             `Type: ${invoice?.type}`,
+            `Line amount types: ${invoice?.lineAmountTypes}`,
             `Total: ${invoice?.total}`,
             `Status: ${invoice?.status}`,
             deepLink ? `Link to view: ${deepLink}` : null,
